@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Senko Chat</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="bot-info">
+                <div class="bot-avatar">
+                    <i class="fas fa-paw"></i>
+                </div>
+                <div class="bot-details">
+                    <h2>Senko</h2>
+                    <span class="status" id="status">Ready</span>
+                </div>
+            </div>
+            <div class="chat-controls">
+                <button id="clearBtn" class="control-btn" title="Clear Chat">
+                    <i class="fas fa-broom"></i>
+                </button>
+                <button id="memoryBtn" class="control-btn" title="Memory Info">
+                    <i class="fas fa-memory"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="message bot-message">
+                <div class="message-avatar">
+                    <i class="fas fa-paw"></i>
+                </div>
+                <div class="message-content">
+                    <p>*tail swishes gently* Hello there! I'm Senko, your helpful fox companion. How may I assist you today? *tilts head with a warm smile*</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator" style="display: none;">
+            <div class="message bot-message">
+                <div class="message-avatar">
+                    <i class="fas fa-paw"></i>
+                </div>
+                <div class="message-content">
+                    <div class="typing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-input-container">
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="Type your message..." autocomplete="off">
+                <button id="sendBtn" class="send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="info-modal" id="infoModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Memory Information</h3>
+                <button class="close-btn" id="closeModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Memory info will be displayed here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
