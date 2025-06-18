@@ -5,6 +5,13 @@
     box-sizing: border-box;
 }
 
+:root {
+    --primary-color: #ff6b6b;
+    --secondary-color: #fff0f5;
+    --accent-color: #ffc0cb;
+    --botAvatarUrl: url(https://i.pinimg.com/736x/90/bf/95/90bf951fa185be630633651afc779e2c.jpg);
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -58,16 +65,33 @@ body {
 }
 
 .bot-avatar {
-    width: 50px;
-    height: 50px;
-    background: rgba(255, 255, 255, 0.3);
+    background-image: var(--botAvatarUrl);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     border-radius: 50%;
+    width: 60px;  /* Increased from 50px */
+    height: 60px; /* Increased from 50px */
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
-    color: #ff6b6b;
-    animation: bounce 2s infinite;
+    font-size: 28px; /* Slightly larger to match new size */
+    
+    /* Subtle shadow for depth */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    
+    /* Smooth transition for hover effects */
+    transition: all 0.2s ease;
+    
+    /* Optional: Slightly rounded corners for the "radius style" */
+    /* 45% gives a barely perceptible softening while maintaining circle */
+    border-radius: 45%; 
+}
+
+/* Optional hover effect */
+.bot-avatar:hover {
+    transform: scale(1.05);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
 }
 
 @keyframes bounce {
@@ -183,8 +207,11 @@ body {
 }
 
 .bot-message .message-avatar {
-    background: linear-gradient(135deg, #ff9a9e, #fecfef);
-    color: #ff6b6b;
+    background-image: var(--botAvatarUrl);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border-radius: 50%;
 }
 
 .user-message {
