@@ -8,21 +8,33 @@ class SenkoConfig {
         }
     };
 
-    // Fallback models in case API call fails
+    // Fallback models in case API call fails - with Llama 4 Scout as priority
     static FALLBACK_MODELS = {
+        'llama-4-scout': { 
+            id: 'meta-llama/llama-4-scout-17b-16e-instruct', 
+            name: 'Llama 4 Scout 17B', 
+            free: true,
+            description: 'Latest Llama 4 Scout model - most advanced',
+            type: 'chat'
+        },
         'llama-3.1-70b': { 
             id: 'llama-3.1-70b-versatile', 
             name: 'Llama 3.1 70B', 
             free: true,
-            description: 'Most balanced and capable'
+            description: 'Most balanced and capable',
+            type: 'chat'
         },
         'llama-3.1-8b': { 
             id: 'llama-3.1-8b-instant', 
             name: 'Llama 3.1 8B', 
             free: true,
-            description: 'Fast and efficient'
+            description: 'Fast and efficient',
+            type: 'chat'
         }
     };
+
+    // Preferred default model ID
+    static DEFAULT_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
     static CHAT = {
         maxTokens: 2000,
@@ -63,6 +75,55 @@ class APIHandler {
         return this.apiKey;
     }
 
+    // Check if a model is a chat model based on its properties
+    isChatModel(model) {
+        const modelId = model.id ? model.id.toLowerCase() : '';
+        const modelOwnedBy = model.owned_by ? model.owned_by.toLowerCase() : '';
+        
+        // Filter out non-chat models
+        const nonChatIndicators = [
+            'whisper',
+            'embedding',
+            'tts',
+            'text-to-speech',
+            'speech',
+            'audio',
+            'vision',
+            'image',
+            'code-only',
+            'completion-only'
+        ];
+        
+        // Check if model has non-chat indicators
+        for (const indicator of nonChatIndicators) {
+            if (modelId.includes(indicator) || modelOwnedBy.includes(indicator)) {
+                return false;
+            }
+        }
+        
+        // Chat model indicators
+        const chatIndicators = [
+            'chat',
+            'instruct',
+            'llama',
+            'mixtral',
+            'gemma',
+            'qwen',
+            'phi',
+            'mistral'
+        ];
+        
+        // Check if model has chat indicators
+        for (const indicator of chatIndicators) {
+            if (modelId.includes(indicator) || modelOwnedBy.includes(indicator)) {
+                return true;
+            }
+        }
+        
+        // Default to true if unclear (assume it's a chat model)
+        return true;
+    }
+
     async fetchAvailableModels() {
         if (!this.apiKey) {
             console.warn('No API key available for fetching models');
@@ -86,28 +147,31 @@ class APIHandler {
             const models = {};
 
             if (data.data && Array.isArray(data.data)) {
-                data.data.forEach(model => {
-                    // Create a friendly key from the model ID
-                    const friendlyKey = this.createFriendlyKey(model.id);
-                    const friendlyName = this.createFriendlyName(model.id);
-                    
-                    models[friendlyKey] = {
-                        id: model.id,
-                        name: friendlyName,
-                        free: true, // Groq models are generally free
-                        description: this.getModelDescription(model.id),
-                        created: model.created,
-                        owned_by: model.owned_by
-                    };
-                });
+                data.data
+                    .filter(model => this.isChatModel(model)) // Filter for chat models only
+                    .forEach(model => {
+                        // Create a friendly key from the model ID
+                        const friendlyKey = this.createFriendlyKey(model.id);
+                        const friendlyName = this.createFriendlyName(model.id);
+                        
+                        models[friendlyKey] = {
+                            id: model.id,
+                            name: friendlyName,
+                            free: true, // Groq models are generally free
+                            description: this.getModelDescription(model.id),
+                            created: model.created,
+                            owned_by: model.owned_by,
+                            type: 'chat'
+                        };
+                    });
             }
 
             // If we got models, cache them
             if (Object.keys(models).length > 0) {
-                console.log(`🔄 Loaded ${Object.keys(models).length} available models from API`);
+                console.log(`🔄 Loaded ${Object.keys(models).length} chat models from API`);
                 return models;
             } else {
-                console.warn('No models returned from API, using fallback');
+                console.warn('No chat models returned from API, using fallback');
                 return this.config.FALLBACK_MODELS;
             }
 
@@ -131,6 +195,7 @@ class APIHandler {
         // Convert model ID to a readable name
         let name = modelId
             .replace(/-/g, ' ')
+            .replace(/\//g, ' ')
             .replace(/\b\w/g, l => l.toUpperCase());
         
         // Clean up common patterns
@@ -143,7 +208,9 @@ class APIHandler {
     getModelDescription(modelId) {
         const id = modelId.toLowerCase();
         
-        if (id.includes('llama') && id.includes('70b')) {
+        if (id.includes('llama-4') && id.includes('scout')) {
+            return 'Latest Llama 4 Scout - most advanced';
+        } else if (id.includes('llama') && id.includes('70b')) {
             return 'Most balanced and capable';
         } else if (id.includes('llama') && id.includes('8b')) {
             return 'Fast and efficient';
@@ -164,7 +231,7 @@ class APIHandler {
         } else if (id.includes('large')) {
             return 'High capability';
         } else {
-            return 'Available model';
+            return 'Available chat model';
         }
     }
 
@@ -341,42 +408,96 @@ class UIManager {
         const button = document.createElement('button');
         const buttonColor = isCurrent ? '#007bff' : '#28a745';
         
-        button.textContent = `${modelData.name} (FREE)`;
+        button.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold; font-size: 13px;">${modelData.name}</div>
+                    <div style="font-size: 11px; opacity: 0.8;">${modelData.description}</div>
+                </div>
+                <div style="font-size: 10px; opacity: 0.7;">FREE</div>
+            </div>
+        `;
+        
         button.style.cssText = `
-            padding: 6px 12px; 
-            margin: 2px; 
+            padding: 12px 16px; 
+            margin: 4px 0; 
             background: ${buttonColor}; 
             color: white; 
             border: none; 
-            border-radius: 4px; 
+            border-radius: 8px; 
             cursor: pointer; 
-            font-size: 11px;
             display: block;
             width: 100%;
             text-align: left;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         `;
         
+        // Add hover effect
+        button.addEventListener('mouseenter', () => {
+            button.style.transform = 'translateY(-1px)';
+            button.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+        });
+        
+        button.addEventListener('mouseleave', () => {
+            button.style.transform = 'translateY(0)';
+            button.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+        });
+        
         // Add tooltip with model ID
-        button.title = `Model ID: ${modelData.id}\n${modelData.description}`;
+        button.title = `Model ID: ${modelData.id}`;
         
         button.addEventListener('click', () => onClickHandler(modelKey));
         return button;
     }
 
-    createActionButton(text, color, onClickHandler) {
+    createActionButton(text, color, onClickHandler, icon = '') {
         const button = document.createElement('button');
-        button.textContent = text;
+        button.innerHTML = `${icon ? `<i class="${icon}"></i> ` : ''}${text}`;
         button.style.cssText = `
-            padding: 8px 16px; 
+            padding: 10px 16px; 
             margin: 4px; 
             background: ${color}; 
             color: white; 
             border: none; 
-            border-radius: 4px; 
+            border-radius: 6px; 
             cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         `;
+        
+        button.addEventListener('mouseenter', () => {
+            button.style.transform = 'translateY(-1px)';
+            button.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+        });
+        
+        button.addEventListener('mouseleave', () => {
+            button.style.transform = 'translateY(0)';
+            button.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+        });
+        
         button.addEventListener('click', onClickHandler);
         return button;
+    }
+
+    createInfoCard(title, content, color = '#f8f9fa') {
+        const card = document.createElement('div');
+        card.style.cssText = `
+            background: ${color};
+            border-radius: 8px;
+            padding: 16px;
+            margin: 8px 0;
+            border-left: 4px solid #007bff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        `;
+        
+        card.innerHTML = `
+            <h4 style="margin: 0 0 12px 0; color: #333; font-size: 16px;">${title}</h4>
+            <div style="color: #666; font-size: 14px; line-height: 1.5;">${content}</div>
+        `;
+        
+        return card;
     }
 }
 
@@ -469,17 +590,32 @@ class SenkoChatUI {
     }
 
     async loadAvailableModels() {
-        this.uiManager.updateStatus('Loading models...');
+        this.uiManager.updateStatus('Loading chat models...');
         
         try {
             this.availableModels = await this.apiHandler.fetchAvailableModels();
             
-            // Set default model (first available model)
-            const modelKeys = Object.keys(this.availableModels);
-            if (modelKeys.length > 0) {
-                const defaultModelKey = modelKeys[0];
-                this.currentModel = this.availableModels[defaultModelKey].id;
-                console.log(`🎯 Default model set to: ${this.currentModel}`);
+            // Try to set the preferred default model first
+            const preferredModel = this.config.DEFAULT_MODEL;
+            let defaultModelSet = false;
+            
+            // Check if preferred model exists in available models
+            for (const [key, model] of Object.entries(this.availableModels)) {
+                if (model.id === preferredModel) {
+                    this.currentModel = model.id;
+                    defaultModelSet = true;
+                    console.log(`🎯 Preferred default model set: ${this.currentModel}`);
+                    break;
+                }
+            }
+            
+            // If preferred model not found, use first available model
+            if (!defaultModelSet) {
+                const modelKeys = Object.keys(this.availableModels);
+                if (modelKeys.length > 0) {
+                    this.currentModel = this.availableModels[modelKeys[0]].id;
+                    console.log(`⚠️ Preferred model not available, using: ${this.currentModel}`);
+                }
             }
             
             this.uiManager.updateStatus('Ready');
@@ -487,9 +623,9 @@ class SenkoChatUI {
             console.error('Failed to load models:', error);
             this.uiManager.updateStatus('Model loading failed');
             
-            // Use fallback models
+            // Use fallback models and set default
             this.availableModels = this.config.FALLBACK_MODELS;
-            this.currentModel = this.availableModels[Object.keys(this.availableModels)[0]].id;
+            this.currentModel = this.config.DEFAULT_MODEL; // Use preferred default even in fallback
         }
     }
 
@@ -499,9 +635,9 @@ class SenkoChatUI {
             return;
         }
 
-        this.uiManager.updateStatus('Refreshing models...');
+        this.uiManager.updateStatus('Refreshing chat models...');
         await this.loadAvailableModels();
-        alert(`✅ Models refreshed! Found ${Object.keys(this.availableModels).length} available models.`);
+        alert(`✅ Chat models refreshed! Found ${Object.keys(this.availableModels).length} available chat models.`);
     }
 
     checkApiKey() {
@@ -526,7 +662,7 @@ class SenkoChatUI {
         
         if (key && key.trim()) {
             this.apiHandler.setApiKey(key.trim());
-            this.uiManager.updateStatus('Loading models...');
+            this.uiManager.updateStatus('Loading chat models...');
             await this.loadAvailableModels();
             console.log('🔑 Groq API key set successfully');
         } else {
@@ -603,6 +739,7 @@ class SenkoChatUI {
         }
     }
 
+
     async handleError(error) {
         console.error('Error calling Groq API:', error);
         
@@ -633,7 +770,7 @@ class SenkoChatUI {
             hidden: isHidden
         });
     }
-
+    
     clearChat() {
         if (confirm(this.config.UI.clearConfirmation)) {
             this.uiManager.clearChat();
