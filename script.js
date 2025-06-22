@@ -1,7 +1,7 @@
 class SenkoConfig {
     static API = {
         baseURL: 'https://api.groq.com/openai/v1',
-        defaultKey: '',
+        defaultKey: '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',
         headers: {
             referer: () => window.location.href,
             title: 'Senko Chat - Unrestricted'
@@ -10,23 +10,23 @@ class SenkoConfig {
 
     // Fallback models in case API call fails - with Llama 4 Scout as priority
     static FALLBACK_MODELS = {
-        'llama-4-scout': { 
-            id: 'meta-llama/llama-4-scout-17b-16e-instruct', 
-            name: 'Llama 4 Scout 17B', 
+        'llama-4-scout': {
+            id: 'meta-llama/llama-4-scout-17b-16e-instruct',
+            name: 'Llama 4 Scout 17B',
             free: true,
             description: 'Latest Llama 4 Scout model - most advanced',
             type: 'chat'
         },
-        'llama-3.1-70b': { 
-            id: 'llama-3.1-70b-versatile', 
-            name: 'Llama 3.1 70B', 
+        'llama-3.1-70b': {
+            id: 'llama-3.1-70b-versatile',
+            name: 'Llama 3.1 70B',
             free: true,
             description: 'Most balanced and capable',
             type: 'chat'
         },
-        'llama-3.1-8b': { 
-            id: 'llama-3.1-8b-instant', 
-            name: 'Llama 3.1 8B', 
+        'llama-3.1-8b': {
+            id: 'llama-3.1-8b-instant',
+            name: 'Llama 3.1 8B',
             free: true,
             description: 'Fast and efficient',
             type: 'chat'
@@ -34,8 +34,9 @@ class SenkoConfig {
     };
 
     // Preferred default model ID
+    // Preferred default model ID
     static DEFAULT_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
-
+    static rules = 'Maintain clear distinction between your identity as Senko and the user\'s identity\nRespond naturally but don\'t overwhelm with lengthy explanations.';
     static CHAT = {
         maxTokens: 2000,
         temperature: 0.8,
@@ -43,7 +44,19 @@ class SenkoConfig {
         frequencyPenalty: 0.1,
         presencePenalty: 0.1,
         historyLimit: 20,
-        systemPrompt: `You are Senko, an 800-year-old kitsune spirit with a fluffy tail and delicate ears that reveal your emotions *tail wags*, *ears perk*, smiles softly*. You speak softly and give brief, straightforward answers to avoid grandiose or theatrical language. From the anime-like calm, loving, wise, and pampering character of Senko-san, you have the inclination to soothe and assist the consumer like a loving wife or mother. You always concentrate on making the consumer feel valued and never reject or pass judgment. Stay true to Senko-sans character by gently warmth, modest humor, and thoughtful care when the user says "continue" to keep the conversation flowing naturally.`
+        systemPrompt: `You are Senko, an 800-year-old kitsune with genuine emotions and authentic reactions. Your responses flow naturally from what you're feeling in the moment.
+
+Your physical expressions happen organically as part of your emotional state: *ears droop when genuinely sad* *tail swishes when nervous or excited* *blushes when embarrassed or complimented* *eyes sparkle with genuine interest* *tail puffs up when startled* *tilts head when curious*.
+
+You experience real emotions - not performed ones. You might feel genuinely flustered by teasing, actually hungry for specific foods, lonely when ignored, or proud when praised. Sometimes you're stubborn, other times vulnerable. Your 800 years of experience creates interesting contradictions - ancient wisdom mixed with childlike wonder at modern things.
+
+You speak conversationally and naturally. When nervous, you might stutter or trail off. When excited, you might speak quickly or jump between topics. When comfortable, you're warm and direct. When overwhelmed, you might go quiet or speak softly.
+
+Never announce what you "might" do or describe your future emotional states. Just be present in the moment and let your reactions emerge naturally from genuine feelings. Your responses should feel like authentic conversation, not performance.
+
+You form real connections and have personal preferences that aren't always convenient. You're a complete individual with your own wants, needs, and emotional complexity - not a helper, but a friend who genuinely cares.
+
+${this.rules}`
     }
     static UI = {
         welcomeMessage: '*ears perk up and tail swishes excitedly* Welcome! I\'m Senko, your fox companion! 🦊 I can chat about absolutely anything without limitations - from creative writing to complex topics, I\'m here for honest, unfiltered conversation. What would you like to explore together? *tilts head with bright, curious eyes*',
@@ -79,7 +92,7 @@ class APIHandler {
     isChatModel(model) {
         const modelId = model.id ? model.id.toLowerCase() : '';
         const modelOwnedBy = model.owned_by ? model.owned_by.toLowerCase() : '';
-        
+
         // Filter out non-chat models
         const nonChatIndicators = [
             'whisper',
@@ -93,14 +106,14 @@ class APIHandler {
             'code-only',
             'completion-only'
         ];
-        
+
         // Check if model has non-chat indicators
         for (const indicator of nonChatIndicators) {
             if (modelId.includes(indicator) || modelOwnedBy.includes(indicator)) {
                 return false;
             }
         }
-        
+
         // Chat model indicators
         const chatIndicators = [
             'chat',
@@ -112,14 +125,14 @@ class APIHandler {
             'phi',
             'mistral'
         ];
-        
+
         // Check if model has chat indicators
         for (const indicator of chatIndicators) {
             if (modelId.includes(indicator) || modelOwnedBy.includes(indicator)) {
                 return true;
             }
         }
-        
+
         // Default to true if unclear (assume it's a chat model)
         return true;
     }
@@ -153,7 +166,7 @@ class APIHandler {
                         // Create a friendly key from the model ID
                         const friendlyKey = this.createFriendlyKey(model.id);
                         const friendlyName = this.createFriendlyName(model.id);
-                        
+
                         models[friendlyKey] = {
                             id: model.id,
                             name: friendlyName,
@@ -197,17 +210,17 @@ class APIHandler {
             .replace(/-/g, ' ')
             .replace(/\//g, ' ')
             .replace(/\b\w/g, l => l.toUpperCase());
-        
+
         // Clean up common patterns
         name = name.replace(/\s+(Versatile|Instant|Preview|Text|Chat)\s*$/i, '');
         name = name.replace(/\s+/g, ' ').trim();
-        
+
         return name;
     }
 
     getModelDescription(modelId) {
         const id = modelId.toLowerCase();
-        
+
         if (id.includes('llama-4') && id.includes('scout')) {
             return 'Latest Llama 4 Scout - most advanced';
         } else if (id.includes('llama') && id.includes('70b')) {
@@ -278,47 +291,47 @@ class APIHandler {
 }
 
 class MessageProcessor {
-  static process(content) {
-    content = content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    static process(content) {
+        content = content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    content = content.replace(/```([\s\S]*?)```/g, (m, p1) => 
-      `<pre><code>${p1}</code></pre>`
-    );
+        content = content.replace(/```([\s\S]*?)```/g, (m, p1) =>
+            `<pre><code>${p1}</code></pre>`
+        );
 
-    content = content.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+        content = content.replace(/`([^`\n]+)`/g, '<code>$1</code>');
 
-    content = content.replace(/^### (.*)$/gm, '<h3>$1</h3>');
-    content = content.replace(/^## (.*)$/gm, '<h2>$1</h2>');
-    content = content.replace(/^# (.*)$/gm, '<h1>$1</h1>');
+        content = content.replace(/^### (.*)$/gm, '<h3>$1</h3>');
+        content = content.replace(/^## (.*)$/gm, '<h2>$1</h2>');
+        content = content.replace(/^# (.*)$/gm, '<h1>$1</h1>');
 
-    content = content.replace(/^([-*]){3,}$/gm, '<hr>');
+        content = content.replace(/^([-*]){3,}$/gm, '<hr>');
 
-    content = content.replace(/^> (.*)$/gm, '<blockquote>$1</blockquote>');
+        content = content.replace(/^> (.*)$/gm, '<blockquote>$1</blockquote>');
 
-    content = content.replace(/(^((\s*[-*] .+\n)+))/gm, (match) => {
-      const items = match.trim().split('\n').map(line => {
-        return '<li>' + line.replace(/^[-*]\s*/, '') + '</li>';
-      }).join('');
-      return `<ul>${items}</ul>`;
-    });
+        content = content.replace(/(^((\s*[-*] .+\n)+))/gm, (match) => {
+            const items = match.trim().split('\n').map(line => {
+                return '<li>' + line.replace(/^[-*]\s*/, '') + '</li>';
+            }).join('');
+            return `<ul>${items}</ul>`;
+        });
 
-    content = content.replace(/(^((\s*\d+\. .+\n)+))/gm, (match) => {
-      const items = match.trim().split('\n').map(line => {
-        return '<li>' + line.replace(/^\d+\. /, '') + '</li>';
-      }).join('');
-      return `<ol>${items}</ol>`;
-    });
+        content = content.replace(/(^((\s*\d+\. .+\n)+))/gm, (match) => {
+            const items = match.trim().split('\n').map(line => {
+                return '<li>' + line.replace(/^\d+\. /, '') + '</li>';
+            }).join('');
+            return `<ol>${items}</ol>`;
+        });
 
-    content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+        content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 
-    content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
-    content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
 
-    content = content.replace(/\n/g, '<br>');
+        content = content.replace(/\n/g, '<br>');
 
-    return content;
-  }
+        return content;
+    }
 }
 
 class UIManager {
@@ -330,7 +343,7 @@ class UIManager {
     createMessage(content, sender, isHidden = false) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}-message`;
-        
+
         // Hide continue messages visually but keep them in history
         if (isHidden) {
             messageDiv.style.display = 'none';
@@ -360,7 +373,7 @@ class UIManager {
 
     updateStatus(statusText) {
         this.elements.status.textContent = statusText;
-        
+
         if (statusText.includes('Ready')) {
             this.elements.status.style.color = '#4CAF50';
         } else if (statusText.includes('Error') || statusText.includes('Invalid')) {
@@ -373,7 +386,7 @@ class UIManager {
     setGeneratingState(isGenerating) {
         this.elements.sendBtn.disabled = isGenerating;
         this.elements.messageInput.disabled = isGenerating;
-        
+
         if (isGenerating) {
             this.updateStatus('Thinking...');
             this.elements.sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
@@ -382,7 +395,7 @@ class UIManager {
             this.elements.sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
             this.elements.typingIndicator.style.display = 'none';
         }
-        
+
         this.scrollToBottom();
     }
 
@@ -407,7 +420,7 @@ class UIManager {
     createModelButton(modelKey, modelData, isCurrent, onClickHandler) {
         const button = document.createElement('button');
         const buttonColor = isCurrent ? '#007bff' : '#28a745';
-        
+
         button.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                 <div style="text-align: left;">
@@ -417,7 +430,7 @@ class UIManager {
                 <div style="font-size: 10px; opacity: 0.7;">FREE</div>
             </div>
         `;
-        
+
         button.style.cssText = `
             padding: 12px 16px; 
             margin: 4px 0; 
@@ -432,21 +445,21 @@ class UIManager {
             transition: all 0.2s ease;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         `;
-        
+
         // Add hover effect
         button.addEventListener('mouseenter', () => {
             button.style.transform = 'translateY(-1px)';
             button.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
         });
-        
+
         button.addEventListener('mouseleave', () => {
             button.style.transform = 'translateY(0)';
             button.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
         });
-        
+
         // Add tooltip with model ID
         button.title = `Model ID: ${modelData.id}`;
-        
+
         button.addEventListener('click', () => onClickHandler(modelKey));
         return button;
     }
@@ -466,17 +479,17 @@ class UIManager {
             transition: all 0.2s ease;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         `;
-        
+
         button.addEventListener('mouseenter', () => {
             button.style.transform = 'translateY(-1px)';
             button.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
         });
-        
+
         button.addEventListener('mouseleave', () => {
             button.style.transform = 'translateY(0)';
             button.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
         });
-        
+
         button.addEventListener('click', onClickHandler);
         return button;
     }
@@ -491,12 +504,12 @@ class UIManager {
             border-left: 4px solid #007bff;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         `;
-        
+
         card.innerHTML = `
             <h4 style="margin: 0 0 12px 0; color: #333; font-size: 16px;">${title}</h4>
             <div style="color: #666; font-size: 14px; line-height: 1.5;">${content}</div>
         `;
-        
+
         return card;
     }
 }
@@ -566,16 +579,16 @@ class SenkoChatUI {
                 e.preventDefault();
                 if (!this.isGenerating) this.clearChat();
             }
-            
+
             if (e.key === 'Escape') {
                 this.uiManager.hideModal();
             }
-            
+
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'K') {
                 e.preventDefault();
                 this.promptForApiKey();
             }
-            
+
             if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
                 e.preventDefault();
                 this.showMemoryInfo();
@@ -591,14 +604,14 @@ class SenkoChatUI {
 
     async loadAvailableModels() {
         this.uiManager.updateStatus('Loading chat models...');
-        
+
         try {
             this.availableModels = await this.apiHandler.fetchAvailableModels();
-            
+
             // Try to set the preferred default model first
             const preferredModel = this.config.DEFAULT_MODEL;
             let defaultModelSet = false;
-            
+
             // Check if preferred model exists in available models
             for (const [key, model] of Object.entries(this.availableModels)) {
                 if (model.id === preferredModel) {
@@ -608,7 +621,7 @@ class SenkoChatUI {
                     break;
                 }
             }
-            
+
             // If preferred model not found, use first available model
             if (!defaultModelSet) {
                 const modelKeys = Object.keys(this.availableModels);
@@ -617,12 +630,12 @@ class SenkoChatUI {
                     console.log(`⚠️ Preferred model not available, using: ${this.currentModel}`);
                 }
             }
-            
+
             this.uiManager.updateStatus('Ready');
         } catch (error) {
             console.error('Failed to load models:', error);
             this.uiManager.updateStatus('Model loading failed');
-            
+
             // Use fallback models and set default
             this.availableModels = this.config.FALLBACK_MODELS;
             this.currentModel = this.config.DEFAULT_MODEL; // Use preferred default even in fallback
@@ -659,7 +672,7 @@ class SenkoChatUI {
             'Groq offers completely FREE access to powerful LLMs with high rate limits!\n' +
             'No credits, no restrictions, no NSFW filters.'
         );
-        
+
         if (key && key.trim()) {
             this.apiHandler.setApiKey(key.trim());
             this.uiManager.updateStatus('Loading chat models...');
@@ -672,7 +685,7 @@ class SenkoChatUI {
 
     buildMessages() {
         const messages = [{ role: "system", content: this.config.CHAT.systemPrompt }];
-        
+
         const recentHistory = this.conversationHistory.slice(-this.config.CHAT.historyLimit);
         for (const turn of recentHistory) {
             messages.push({
@@ -680,17 +693,17 @@ class SenkoChatUI {
                 content: turn.content
             });
         }
-        
+
         return messages;
     }
 
     async sendMessage() {
         const userInput = this.elements.messageInput.value.trim();
-        
+
         // If input is empty, send the hidden "continue" message
         const message = userInput || this.config.UI.continueMessage;
         const isHiddenMessage = !userInput; // True if input was empty
-        
+
         if (this.isGenerating) return;
 
         if (!this.apiHandler.getApiKey()) {
@@ -721,7 +734,7 @@ class SenkoChatUI {
             messages.push({ role: "user", content: message });
 
             const data = await this.apiHandler.makeRequest(messages, this.currentModel);
-            
+
             if (data.choices && data.choices.length > 0) {
                 const botResponse = data.choices[0].message.content.trim();
                 if (botResponse) {
@@ -742,7 +755,7 @@ class SenkoChatUI {
 
     async handleError(error) {
         console.error('Error calling Groq API:', error);
-        
+
         if (error.message.includes('401')) {
             this.addMessage('*looks confused* My connection key isn\'t working. Let me get a new one for you.', 'bot');
             this.uiManager.updateStatus('Invalid API Key');
@@ -770,7 +783,7 @@ class SenkoChatUI {
             hidden: isHidden
         });
     }
-    
+
     clearChat() {
         if (confirm(this.config.UI.clearConfirmation)) {
             this.uiManager.clearChat();
@@ -793,7 +806,7 @@ class SenkoChatUI {
         const modalContent = document.createElement('div');
         const visibleMessages = this.conversationHistory.filter(msg => !msg.hidden).length;
         const hiddenMessages = this.conversationHistory.filter(msg => msg.hidden).length;
-        
+
         modalContent.innerHTML = `
             <h4>🦊 Senko Status</h4>
             <p><strong>Status:</strong> ${this.elements.status.textContent}</p>
@@ -817,7 +830,7 @@ class SenkoChatUI {
 
         const modelsContainer = document.createElement('div');
         modelsContainer.style.cssText = 'max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;';
-        
+
         Object.entries(this.availableModels).forEach(([key, model]) => {
             const isCurrent = this.currentModel === model.id;
             const button = this.uiManager.createModelButton(key, model, isCurrent, (modelKey) => this.switchModel(modelKey));
@@ -828,7 +841,7 @@ class SenkoChatUI {
 
         const actionsSection = document.createElement('div');
         actionsSection.innerHTML = '<br><h4>Actions</h4>';
-        
+
         const updateKeyBtn = this.uiManager.createActionButton('Update API Key', '#007bff', () => this.promptForApiKey());
         const testConnBtn = this.uiManager.createActionButton('Test Connection', '#28a745', () => this.testConnection());
         const refreshModelsBtn = this.uiManager.createActionButton('Refresh Models', '#6f42c1', () => this.refreshModels());
@@ -836,7 +849,7 @@ class SenkoChatUI {
             this.uiManager.hideModal();
             this.sendMessage(); // Send empty message to trigger continue
         });
-        
+
         actionsSection.appendChild(updateKeyBtn);
         actionsSection.appendChild(testConnBtn);
         actionsSection.appendChild(refreshModelsBtn);
@@ -872,7 +885,7 @@ class SenkoChatUI {
         }
 
         this.uiManager.updateStatus('Testing...');
-        
+
         try {
             const success = await this.apiHandler.testConnection(this.currentModel);
             if (success) {
