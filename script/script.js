@@ -1,7 +1,7 @@
 class SenkoConfig {
     static API = {
         baseURL: 'https://api.groq.com/openai/v1',
-        defaultKey: ' ',
+        defaultKey: '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',
         headers: {
             referer: () => window.location.href,
             title: 'Senko Chat - Unrestricted'
