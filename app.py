@@ -1,16 +1,18 @@
-from flask import Flask, send_from_directory
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 import webbrowser
 import threading
 
-app = Flask(__name__, static_folder="html")
+app = FastAPI()
 
-@app.route('/')
-def serve_index():
-    return send_from_directory(app.static_folder, 'index.html')
+app.mount("/", StaticFiles(directory="HTML", html=True), name="static")
 
 def open_browser():
-    webbrowser.open('http://127.0.0.1:5000/')
+    webbrowser.open("http://127.0.0.1:8080")
 
-if __name__ == '__main__':
+# This starts the browser automatically on script run
+if __name__ == "__main__":
+    import uvicorn
     threading.Timer(1.0, open_browser).start()
-    app.run(debug=False)
+    uvicorn.run("main:app", host="0.0.0.0", port=8080)
