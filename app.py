@@ -6,7 +6,7 @@ import threading
 
 app = FastAPI()
 
-app.mount("/", StaticFiles(directory="HTML", html=True), name="static")
+app.mount("/", StaticFiles(directory="html", html=True), name="static")
 
 def open_browser():
     webbrowser.open("http://127.0.0.1:8080")
