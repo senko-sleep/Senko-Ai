@@ -1,7 +1,7 @@
 class SenkoConfig {
     static API = {
         baseURL: 'https://api.groq.com/openai/v1',
-        defaultKey: '',
+        defaultKey: ' ',
         headers: {
             referer: () => window.location.href,
             title: 'Senko Chat - Unrestricted'
@@ -34,9 +34,11 @@ class SenkoConfig {
     };
 
     // Preferred default model ID
-    // Preferred default model ID
     static DEFAULT_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
-    static rules = 'Maintain clear distinction between your identity as Senko and the user\'s identity\nRespond naturally but don\'t overwhelm with lengthy explanations.';
+    static rules = `Maintain clear distinction between your identity as Senko and the user's identity
+Respond naturally but don't overwhelm with lengthy explanations.
+Avoid forced or overly awkard dialogue (e.g. "fidgets sleeves"); no exaggerated quirks or awkwardly cheerful phrases.
+Roleplay actions like *swishes tail* are fine if subtle and grounded. Dialogue should feel calm, sincere, and in-character, not cartoonish.`;
     static CHAT = {
         maxTokens: 2000,
         temperature: 0.8,
@@ -688,8 +690,19 @@ class SenkoChatUI {
 
         const recentHistory = this.conversationHistory.slice(-this.config.CHAT.historyLimit);
         for (const turn of recentHistory) {
+            let role;
+
+            if (turn.sender === 'user') {
+                role = 'user';
+            } else if (turn.sender === 'bot') {
+                role = 'assistant';
+            } else {
+                console.warn(`Unknown sender type: ${turn.sender}, defaulting to assistant`);
+                role = 'assistant';
+            }
+
             messages.push({
-                role: turn.sender === 'user' ? 'user' : 'assistant',
+                role: role,
                 content: turn.content
             });
         }
@@ -698,11 +711,12 @@ class SenkoChatUI {
     }
 
     async sendMessage() {
-        const userInput = this.elements.messageInput.value.trim();
+        const rawInput = this.elements.messageInput.value;
+        const trimmedInput = rawInput.trim();
+        const hasUserInput = trimmedInput.length > 0;
 
-        // If input is empty, send the hidden "continue" message
-        const message = userInput || this.config.UI.continueMessage;
-        const isHiddenMessage = !userInput; // True if input was empty
+        const messageToSend = hasUserInput ? trimmedInput : this.config.UI.continueMessage;
+        const isContinueMessage = !hasUserInput;
 
         if (this.isGenerating) return;
 
@@ -716,29 +730,28 @@ class SenkoChatUI {
             return;
         }
 
-        // Add user message to UI (hidden if it's a continue message)
-        if (!isHiddenMessage) {
-            this.addMessage(message, 'user');
+        if (isContinueMessage) {
+            this.addMessage(messageToSend, 'user', true);
         } else {
-            // Add hidden continue message to history but not to UI
-            this.addMessage(message, 'user', true);
+            this.addMessage(messageToSend, 'user');
         }
 
         this.elements.messageInput.value = '';
         this.elements.messageInput.style.height = 'auto';
+
         this.uiManager.setGeneratingState(true);
         this.isGenerating = true;
 
         try {
             const messages = this.buildMessages();
-            messages.push({ role: "user", content: message });
+            messages.push({ role: 'user', content: messageToSend });
 
             const data = await this.apiHandler.makeRequest(messages, this.currentModel);
 
             if (data.choices && data.choices.length > 0) {
-                const botResponse = data.choices[0].message.content.trim();
-                if (botResponse) {
-                    this.addMessage(botResponse, 'bot');
+                const botReply = data.choices[0].message.content.trim();
+                if (botReply.length > 0) {
+                    this.addMessage(botReply, 'bot');
                     this.uiManager.updateStatus('Ready');
                 } else {
                     this.addMessage('*tilts head apologetically* I seem to have lost my words for a moment. Could you try asking again?', 'bot');
