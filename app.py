@@ -1,37 +1,21 @@
 import os
-import asyncio
-from aiohttp import web
+from flask import Flask, send_from_directory
 
-async def handle_index(request):
-    index_file = os.path.join(os.getcwd(), "html", "index.html")
-    if os.path.isfile(index_file):
-        return web.FileResponse(index_file)
-    return web.Response(text="index.html not found", status=404)
+app = Flask(__name__, static_folder="html")
 
-async def start_web_server():
-    app = web.Application()
-    app.router.add_get("/", handle_index)
-    app.router.add_static("/html", path=os.path.join(os.getcwd(), "html"), name="html")
-    runner = web.AppRunner(app)
-    await runner.setup()
-    port = int(os.getenv("PORT", 8080))
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    print(f"Web server started at http://0.0.0.0:{port}")
-    return runner
+@app.route("/")
+def serve_index():
+    return send_from_directory(app.static_folder, "index.html")
 
-async def start_bot():
+@app.route("/html/<path:path>")
+def serve_static(path):
+    return send_from_directory(app.static_folder, path)
+
+def start_bot():
     print("Bot started")
-
-
-async def main():
-    runner = await start_web_server()
-    try:
-        await asyncio.gather(
-            start_bot(),
-        )
-    finally:
-        await runner.cleanup()
+    # Add your bot startup code here (non-blocking)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    start_bot()
+    port = int(os.getenv("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
