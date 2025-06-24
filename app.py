@@ -1,18 +1,41 @@
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-import webbrowser
-import threading
+import os
+import asyncio
+from aiohttp import web
 
-app = FastAPI()
+# Serve index.html at /
+async def handle_index(request):
+    index_file = os.path.join(os.getcwd(), "html", "index.html")
+    if os.path.isfile(index_file):
+        return web.FileResponse(index_file)
+    return web.Response(text="index.html not found", status=404)
 
-app.mount("/", StaticFiles(directory="html", html=True), name="static")
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", handle_index)
+    app.router.add_static("/html", path=os.path.join(os.getcwd(), "html"), name="html")
+    runner = web.AppRunner(app)
+    await runner.setup()
+    # Render usually expects port from env or 8080 fallback
+    port = int(os.getenv("PORT", 8080))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    print(f"Web server started at http://0.0.0.0:{port}")
+    return runner
 
-def open_browser():
-    webbrowser.open("http://127.0.0.1:8080")
+# Stub async bot runner (replace with your actual bot startup)
+async def start_bot():
+    print("Bot started")
+    while True:
+        await asyncio.sleep(3600)  # Keep running
 
-# This starts the browser automatically on script run
+async def main():
+    runner = await start_web_server()
+    try:
+        await asyncio.gather(
+            start_bot(),
+        )
+    finally:
+        await runner.cleanup()
+
 if __name__ == "__main__":
-    import uvicorn
-    threading.Timer(1.0, open_browser).start()
-    uvicorn.run("main:app", host="0.0.0.0", port=8080)
+    asyncio.run(main())
