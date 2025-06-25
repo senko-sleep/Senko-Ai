@@ -1,7 +1,10 @@
 /**
- * Advanced Chat History Manager
- * Adds edit, delete, and rewind functionality to chat messages
- * Requires script.js to be loaded first
+ * Chat History Manager: Drag-up Modal Controls
+ * - Message actions (edit, delete, rewind, show code) appear in a large modal "sheet" that slides up from the bottom on tap/click of a message
+ * - Modal overlays the UI and is positioned based on the message clicked (if possible)
+ * - Modal is blocky, with large touch targets, and can be dismissed by dragging down or tapping outside
+ * - SHOW ALL CODE toggles code expansion and remains active while modal is open
+ * - Works for both desktop and mobile
  */
 
 class ChatHistoryManager {
@@ -10,6 +13,8 @@ class ChatHistoryManager {
         this.isEditMode = false;
         this.currentEditElement = null;
         this.originalContent = '';
+        this.activeModal = null;
+        this.activeMessageElement = null;
         this.init();
     }
 
@@ -19,7 +24,7 @@ class ChatHistoryManager {
             if (window.senkoChat) {
                 this.senkoChat = window.senkoChat;
                 this.setupHistoryManagement();
-                console.log('🛠️ Chat History Manager initialized');
+                console.log('🛠️ Chat History Manager with Drag-up Modal initialized');
             } else {
                 setTimeout(checkSenkoChat, 100);
             }
@@ -28,82 +33,190 @@ class ChatHistoryManager {
     }
 
     setupHistoryManagement() {
-        // Override the original addMessage to add controls
         const originalAddMessage = this.senkoChat.uiManager.addMessage.bind(this.senkoChat.uiManager);
-        
+
         this.senkoChat.uiManager.addMessage = (content, sender, isHidden = false) => {
             const messageElement = this.senkoChat.uiManager.createMessage(content, sender, isHidden);
-            
-            // Add history controls if not hidden
+
             if (!isHidden) {
                 this.addHistoryControls(messageElement, content, sender);
             }
-            
+
             this.senkoChat.elements.chatMessages.appendChild(messageElement);
             if (!isHidden) {
                 this.senkoChat.uiManager.scrollToBottom();
             }
         };
 
-        // Add CSS for controls
         this.addControlsCSS();
-
-        // Add keyboard shortcuts
         this.setupKeyboardShortcuts();
     }
 
     addHistoryControls(messageElement, content, sender) {
-        const controlsDiv = document.createElement('div');
-        controlsDiv.className = 'message-controls';
-        controlsDiv.innerHTML = `
-            <button class="control-btn edit-btn" title="Edit message (Ctrl+E)">
-                <i class="fas fa-edit"></i>
-            </button>
-            <button class="control-btn delete-btn" title="Delete message (Delete)">
-                <i class="fas fa-trash"></i>
-            </button>
-            <button class="control-btn rewind-btn" title="Rewind to here (Ctrl+R)">
-                <i class="fas fa-undo"></i>
-            </button>
+        // Instead of inline controls, attach modal opener
+        messageElement.addEventListener('click', (e) => {
+            if (this.isEditMode) return;
+            e.stopPropagation();
+            this.showModalForMessage(messageElement, content, sender);
+        });
+    }
+
+    showModalForMessage(messageElement, content, sender) {
+        this.hideModal();
+
+        this.activeMessageElement = messageElement;
+
+        // Get bounding rect for message for animation start
+        const rect = messageElement.getBoundingClientRect();
+
+        // Modal HTML
+        const modal = document.createElement('div');
+        modal.className = 'senko-modal-controls';
+
+        modal.innerHTML = `
+            <div class="senko-modal-backdrop"></div>
+            <div class="senko-modal-sheet" style="top:${Math.min(rect.bottom, window.innerHeight - 80)}px">
+                <div class="senko-modal-dragbar"></div>
+                <div class="senko-modal-actions">
+                    <button class="senko-modal-btn edit-btn"><i class="fas fa-edit"></i> Edit Message</button>
+                    <button class="senko-modal-btn delete-btn"><i class="fas fa-trash"></i> Delete Message</button>
+                    <button class="senko-modal-btn rewind-btn"><i class="fas fa-undo"></i> Rewind Conversation</button>
+                    <button class="senko-modal-btn show-code-btn"><i class="fas fa-code"></i> Show All Code</button>
+                    <button class="senko-modal-btn cancel-btn">Cancel</button>
+                </div>
+            </div>
         `;
 
-        // Insert controls before message content
-        const messageContent = messageElement.querySelector('.message-content');
-        messageElement.insertBefore(controlsDiv, messageContent);
+        document.body.appendChild(modal);
+        this.activeModal = modal;
 
-        // Add event listeners
-        const editBtn = controlsDiv.querySelector('.edit-btn');
-        const deleteBtn = controlsDiv.querySelector('.delete-btn');
-        const rewindBtn = controlsDiv.querySelector('.rewind-btn');
+        // Animate modal up
+        const sheet = modal.querySelector('.senko-modal-sheet');
+        setTimeout(() => {
+            sheet.classList.add('active');
+        }, 20);
 
-        editBtn.addEventListener('click', (e) => {
+        // Drag-to-close support
+        this.setupModalDrag(sheet, modal);
+
+        // Action handlers
+        modal.querySelector('.edit-btn').onclick = (e) => {
             e.stopPropagation();
-            this.editMessage(messageElement, messageContent, content, sender);
-        });
-
-        deleteBtn.addEventListener('click', (e) => {
+            this.hideModal();
+            this.editMessage(messageElement, messageElement.querySelector('.message-content'), content, sender);
+        };
+        modal.querySelector('.delete-btn').onclick = (e) => {
             e.stopPropagation();
+            this.hideModal();
             this.deleteMessage(messageElement);
-        });
-
-        rewindBtn.addEventListener('click', (e) => {
+        };
+        modal.querySelector('.rewind-btn').onclick = (e) => {
             e.stopPropagation();
+            this.hideModal();
             this.rewindToMessage(messageElement);
-        });
+        };
+        modal.querySelector('.show-code-btn').onclick = (e) => {
+            e.stopPropagation();
+            this.toggleShowAllCode(messageElement, true);
+        };
+        modal.querySelector('.cancel-btn').onclick = (e) => {
+            e.stopPropagation();
+            this.hideModal();
+        };
 
-        // Show controls on hover
-        messageElement.addEventListener('mouseenter', () => {
-            if (!this.isEditMode) {
-                controlsDiv.style.opacity = '1';
-            }
-        });
+        // Close on backdrop
+        modal.querySelector('.senko-modal-backdrop').onclick = (e) => {
+            e.stopPropagation();
+            this.hideModal();
+        };
 
-        messageElement.addEventListener('mouseleave', () => {
-            if (!this.isEditMode) {
-                controlsDiv.style.opacity = '0';
+        // Hide modal on Escape
+        window.addEventListener('keydown', this._escKeyHandler = (evt) => {
+            if (evt.key === "Escape") {
+                this.hideModal();
             }
         });
     }
+
+    hideModal() {
+        if (this.activeModal) {
+            this.activeModal.remove();
+            this.activeModal = null;
+            window.removeEventListener('keydown', this._escKeyHandler);
+        }
+    }
+
+    setupModalDrag(sheet, modal) {
+        let startY = null;
+        let startTop = null;
+        let dragging = false;
+
+        const onDragStart = (e) => {
+            dragging = true;
+            startY = (e.touches ? e.touches[0].clientY : e.clientY);
+            startTop = parseInt(window.getComputedStyle(sheet).top, 10);
+            sheet.style.transition = 'none';
+            document.body.style.userSelect = 'none';
+        };
+        const onDragMove = (e) => {
+            if (!dragging) return;
+            let clientY = (e.touches ? e.touches[0].clientY : e.clientY);
+            let delta = clientY - startY;
+            if (delta > 0) {
+                sheet.style.top = (startTop + delta) + 'px';
+                sheet.style.opacity = 1 - Math.min(delta / 200, 0.5);
+            }
+        };
+        const onDragEnd = (e) => {
+            if (!dragging) return;
+            let endY = (e.changedTouches ? e.changedTouches[0].clientY : (e.clientY || startY));
+            let delta = endY - startY;
+            sheet.style.transition = '';
+            document.body.style.userSelect = '';
+            if (delta > 120) {
+                this.hideModal();
+            } else {
+                sheet.style.top = '';
+                sheet.style.opacity = '';
+            }
+            dragging = false;
+        };
+
+        const dragbar = sheet.querySelector('.senko-modal-dragbar');
+        dragbar.addEventListener('mousedown', onDragStart);
+        dragbar.addEventListener('touchstart', onDragStart);
+        window.addEventListener('mousemove', onDragMove);
+        window.addEventListener('touchmove', onDragMove, {passive:false});
+        window.addEventListener('mouseup', onDragEnd);
+        window.addEventListener('touchend', onDragEnd);
+    }
+
+    toggleShowAllCode(messageElement, fromModal = false) {
+        const codeBlocks = messageElement.querySelectorAll('pre, code');
+        let willExpand = false;
+        if (codeBlocks.length) {
+            willExpand = !codeBlocks[0].classList.contains('expanded-code');
+        }
+        codeBlocks.forEach(block => {
+            if (willExpand) {
+                block.classList.add('expanded-code');
+            } else {
+                block.classList.remove('expanded-code');
+            }
+        });
+        let label = messageElement.querySelector('.show-all-code-label');
+        if (willExpand && !label) {
+            label = document.createElement('div');
+            label.className = 'show-all-code-label';
+            label.textContent = 'SHOW ALL CODE';
+            messageElement.appendChild(label);
+        } else if (!willExpand && label) {
+            label.remove();
+        }
+        if (fromModal) this.hideModal();
+    }
+
+    // --- Rest of logic unchanged ---
 
     editMessage(messageElement, messageContent, originalContent, sender) {
         if (this.isEditMode) return;
@@ -112,14 +225,13 @@ class ChatHistoryManager {
         this.currentEditElement = messageElement;
         this.originalContent = originalContent;
 
-        // Hide controls during edit
-        const controls = messageElement.querySelector('.message-controls');
-        controls.style.display = 'none';
-
         // Create edit interface
+        const controls = messageElement.querySelector('.message-controls');
+        if (controls) controls.style.display = 'none';
+
         const editContainer = document.createElement('div');
         editContainer.className = 'edit-container';
-        
+
         const textarea = document.createElement('textarea');
         textarea.className = 'edit-textarea';
         textarea.value = originalContent;
@@ -139,17 +251,14 @@ class ChatHistoryManager {
         messageContent.style.display = 'none';
         messageElement.appendChild(editContainer);
 
-        // Focus textarea and select all
         textarea.focus();
         textarea.select();
 
-        // Auto-resize textarea
         textarea.addEventListener('input', () => {
             textarea.style.height = 'auto';
             textarea.style.height = textarea.scrollHeight + 'px';
         });
 
-        // Button handlers
         const saveBtn = buttonContainer.querySelector('.save-btn');
         const cancelBtn = buttonContainer.querySelector('.cancel-btn');
 
@@ -178,18 +287,15 @@ class ChatHistoryManager {
         const editContainer = this.currentEditElement.querySelector('.edit-container');
         const controls = this.currentEditElement.querySelector('.message-controls');
 
-        // Update message content
-        messageContent.innerHTML = this.senkoChat.uiManager.constructor.name === 'UIManager' 
-            ? MessageProcessor.process(newContent) 
+        messageContent.innerHTML = this.senkoChat.uiManager.constructor.name === 'UIManager'
+            ? MessageProcessor.process(newContent)
             : newContent;
 
-        // Update history
         this.updateHistoryEntry(this.originalContent, newContent);
 
-        // Clean up edit interface
         editContainer.remove();
         messageContent.style.display = 'block';
-        controls.style.display = 'flex';
+        if (controls) controls.style.display = 'flex';
 
         this.resetEditMode();
 
@@ -203,10 +309,9 @@ class ChatHistoryManager {
         const editContainer = this.currentEditElement.querySelector('.edit-container');
         const controls = this.currentEditElement.querySelector('.message-controls');
 
-        // Clean up edit interface
         editContainer.remove();
         messageContent.style.display = 'block';
-        controls.style.display = 'flex';
+        if (controls) controls.style.display = 'flex';
 
         this.resetEditMode();
     }
@@ -223,7 +328,6 @@ class ChatHistoryManager {
         const confirmation = confirm('Are you sure you want to delete this message?');
         if (!confirmation) return;
 
-        // Find message in history and remove it
         const messageContent = messageElement.querySelector('.message-content').textContent;
         const messageIndex = this.findMessageIndex(messageContent);
 
@@ -240,15 +344,12 @@ class ChatHistoryManager {
         const confirmation = confirm('This will delete all messages after this point and continue from here. Are you sure?');
         if (!confirmation) return;
 
-        // Find message in history
         const messageContent = messageElement.querySelector('.message-content').textContent;
         const messageIndex = this.findMessageIndex(messageContent);
 
         if (messageIndex !== -1) {
-            // Remove all messages after this point from history
             this.senkoChat.conversationHistory = this.senkoChat.conversationHistory.slice(0, messageIndex + 1);
 
-            // Remove all DOM elements after this message
             let nextSibling = messageElement.nextElementSibling;
             while (nextSibling) {
                 const toRemove = nextSibling;
@@ -261,9 +362,8 @@ class ChatHistoryManager {
     }
 
     findMessageIndex(content) {
-        // Strip HTML and normalize content for comparison
         const normalizedContent = content.replace(/<[^>]*>/g, '').trim();
-        
+
         return this.senkoChat.conversationHistory.findIndex(msg => {
             const msgContent = msg.content.replace(/<[^>]*>/g, '').trim();
             return msgContent === normalizedContent;
@@ -281,22 +381,16 @@ class ChatHistoryManager {
 
     setupKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
-            // Don't interfere with edit mode
             if (this.isEditMode) return;
 
-            // Ctrl+E: Edit last message
             if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
                 e.preventDefault();
                 this.editLastMessage();
             }
-
-            // Delete: Delete last message
             if (e.key === 'Delete' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 this.deleteLastMessage();
             }
-
-            // Ctrl+R: Rewind to last message
             if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
                 e.preventDefault();
                 this.rewindToLastMessage();
@@ -308,201 +402,132 @@ class ChatHistoryManager {
         const messages = this.senkoChat.elements.chatMessages.querySelectorAll('.message:not([style*="display: none"])');
         if (messages.length > 0) {
             const lastMessage = messages[messages.length - 1];
-            const editBtn = lastMessage.querySelector('.edit-btn');
-            if (editBtn) editBtn.click();
+            this.showModalForMessage(lastMessage, lastMessage.querySelector('.message-content').textContent, 'user');
         }
     }
-
     deleteLastMessage() {
         const messages = this.senkoChat.elements.chatMessages.querySelectorAll('.message:not([style*="display: none"])');
         if (messages.length > 0) {
             const lastMessage = messages[messages.length - 1];
-            const deleteBtn = lastMessage.querySelector('.delete-btn');
-            if (deleteBtn) deleteBtn.click();
+            this.deleteMessage(lastMessage);
         }
     }
-
     rewindToLastMessage() {
         const messages = this.senkoChat.elements.chatMessages.querySelectorAll('.message:not([style*="display: none"])');
         if (messages.length > 1) {
             const secondLastMessage = messages[messages.length - 2];
-            const rewindBtn = secondLastMessage.querySelector('.rewind-btn');
-            if (rewindBtn) rewindBtn.click();
+            this.rewindToMessage(secondLastMessage);
         }
     }
 
     addControlsCSS() {
         const style = document.createElement('style');
         style.textContent = `
-            /* Message Controls */
-            .message {
-                position: relative;
+            /* Modal Sheet Styles */
+            .senko-modal-controls {
+                position: fixed;
+                z-index: 2000;
+                top: 0; left: 0; right: 0; bottom: 0;
+                pointer-events: none;
             }
-
-            .message-controls {
-                position: absolute;
-                top: 8px;
-                right: 8px;
-                display: flex;
-                gap: 4px;
-                opacity: 0;
-                transition: opacity 0.2s ease;
-                background: rgba(0, 0, 0, 0.8);
-                border-radius: 6px;
-                padding: 4px;
-                z-index: 10;
+            .senko-modal-controls .senko-modal-backdrop {
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.20);
+                pointer-events: auto;
             }
-
-            .message:hover .message-controls {
+            .senko-modal-sheet {
+                position: fixed;
+                left: 0;
+                width: 100vw;
+                background: #fff;
+                border-top-left-radius: 22px;
+                border-top-right-radius: 22px;
+                box-shadow: 0 0 32px rgba(0,0,0,0.21);
+                max-width: 500px;
+                margin: 0 auto;
+                right: 0;
+                top: 100vh;
+                transition: top 0.32s cubic-bezier(.5,1.5,.5,1);
                 opacity: 1;
+                pointer-events: auto;
             }
-
-            .control-btn {
-                background: transparent;
+            .senko-modal-sheet.active {
+                top: 28vh;
+            }
+            .senko-modal-dragbar {
+                width: 56px;
+                height: 7px;
+                margin: 12px auto 18px auto;
+                background: #e1e1e1;
+                border-radius: 8px;
+                cursor: grab;
+            }
+            .senko-modal-actions {
+                display: flex;
+                flex-direction: column;
+                gap: 22px;
+                padding: 0 32px 30px 32px;
+            }
+            .senko-modal-btn {
+                font-size: 1.18rem;
+                font-weight: 600;
+                padding: 18px 0;
+                background: #f7f7f7;
                 border: none;
-                color: white;
-                padding: 6px 8px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 12px;
-                transition: all 0.2s ease;
+                border-radius: 12px;
+                margin: 0;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                min-width: 28px;
-                height: 28px;
-            }
-
-            .control-btn:hover {
-                background: rgba(255, 255, 255, 0.2);
-                transform: scale(1.1);
-            }
-
-            .edit-btn:hover {
-                color: #4CAF50;
-            }
-
-            .delete-btn:hover {
-                color: #f44336;
-            }
-
-            .rewind-btn:hover {
-                color: #ff9800;
-            }
-
-            /* Edit Interface */
-            .edit-container {
-                margin: 12px 0;
-                padding: 12px;
-                background: #f8f9fa;
-                border-radius: 8px;
-                border: 2px solid #007bff;
-            }
-
-            .edit-textarea {
-                width: 100%;
-                min-height: 80px;
-                padding: 12px;
-                border: 1px solid #ddd;
-                border-radius: 6px;
-                font-family: inherit;
-                font-size: 14px;
-                line-height: 1.5;
-                resize: vertical;
-                margin-bottom: 12px;
-            }
-
-            .edit-textarea:focus {
-                outline: none;
-                border-color: #007bff;
-                box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-            }
-
-            .edit-buttons {
-                display: flex;
-                gap: 8px;
-                justify-content: flex-end;
-            }
-
-            .save-btn, .cancel-btn {
-                padding: 8px 16px;
-                border: none;
-                border-radius: 4px;
+                gap: 12px;
+                transition: background 0.18s;
                 cursor: pointer;
-                font-size: 13px;
-                font-weight: 500;
-                transition: all 0.2s ease;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            }
+            .senko-modal-btn:active {
+                background: #ececec;
+            }
+            .senko-modal-btn.show-code-btn {
+                color: #2196f3;
+            }
+            .senko-modal-btn.edit-btn { color: #4CAF50; }
+            .senko-modal-btn.delete-btn { color: #f44336; }
+            .senko-modal-btn.rewind-btn { color: #ff9800; }
+            .senko-modal-btn.cancel-btn { color: #555; background: #f0f0f0; }
+
+            /* Modal: mobile full width, desktop max-width */
+            @media (max-width: 600px) {
+                .senko-modal-sheet { max-width: 100vw; left: 0; right: 0; }
             }
 
-            .save-btn {
-                background: #28a745;
-                color: white;
+            /* Code block expansion */
+            pre, code {
+                max-height: 180px;
+                overflow: auto;
+                transition: max-height 0.25s;
             }
-
-            .save-btn:hover {
-                background: #218838;
-                transform: translateY(-1px);
+            .expanded-code {
+                max-height: 1000px !important;
+                overflow: auto;
+                box-shadow: 0 0 0 2px #2196f3;
             }
-
-            .cancel-btn {
-                background: #6c757d;
-                color: white;
-            }
-
-            .cancel-btn:hover {
-                background: #5a6268;
-                transform: translateY(-1px);
-            }
-
-            /* Responsive adjustments */
-            @media (max-width: 768px) {
-                .message-controls {
-                    opacity: 1;
-                    position: static;
-                    background: rgba(0, 0, 0, 0.05);
-                    margin-top: 8px;
-                    justify-content: center;
-                }
-
-                .control-btn {
-                    color: #666;
-                    background: rgba(255, 255, 255, 0.8);
-                    border: 1px solid #ddd;
-                }
-
-                .control-btn:hover {
-                    background: white;
-                    color: #333;
-                }
-            }
-
-            /* Animation for message deletion */
-            .message.deleting {
-                animation: slideOut 0.3s ease-out forwards;
-            }
-
-            @keyframes slideOut {
-                0% {
-                    opacity: 1;
-                    transform: translateX(0);
-                    max-height: 200px;
-                }
-                100% {
-                    opacity: 0;
-                    transform: translateX(-100%);
-                    max-height: 0;
-                    margin: 0;
-                    padding: 0;
-                }
-            }
-
-            /* Edit indicator */
-            .message.edited .message-content::after {
-                content: "(edited)";
-                font-size: 11px;
-                color: #999;
-                font-style: italic;
-                margin-left: 8px;
+            .show-all-code-label {
+                position: absolute;
+                left: 50%;
+                bottom: 44px;
+                transform: translateX(-50%);
+                background: #1e293b;
+                color: #fff;
+                font-size: 12px;
+                font-weight: 600;
+                padding: 4px 14px;
+                border-radius: 20px;
+                opacity: 0.97;
+                pointer-events: none;
+                z-index: 200;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+                white-space: nowrap;
             }
         `;
         document.head.appendChild(style);
@@ -513,7 +538,6 @@ class ChatHistoryManager {
         const total = this.senkoChat.conversationHistory.length;
         const edited = this.senkoChat.conversationHistory.filter(msg => msg.edited).length;
         const hidden = this.senkoChat.conversationHistory.filter(msg => msg.hidden).length;
-        
         return {
             total,
             edited,
@@ -521,7 +545,6 @@ class ChatHistoryManager {
             visible: total - hidden
         };
     }
-
     exportHistory() {
         const data = {
             exported: new Date().toISOString(),
@@ -529,7 +552,6 @@ class ChatHistoryManager {
             stats: this.getHistoryStats(),
             history: this.senkoChat.conversationHistory
         };
-        
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -537,7 +559,7 @@ class ChatHistoryManager {
         a.download = `senko-chat-history-${new Date().toISOString().split('T')[0]}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        
+
         console.log('📁 Chat history exported');
     }
 }
